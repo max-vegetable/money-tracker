@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>💰 即时薪资追踪器</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-card: rgba(17, 24, 39, 0.8);
+            --gold-primary: #ffd700;
+            --gold-secondary: #ffaa00;
+            --gold-glow: rgba(255, 215, 0, 0.3);
+            --text-primary: #ffffff;
+            --text-secondary: #9ca3af;
+            --blue-accent: #1a237e;
+            --green-accent: #4caf50;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .app-container {
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            background: 
+                radial-gradient(ellipse at top, rgba(26, 35, 126, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at bottom, rgba(255, 170, 0, 0.05) 0%, transparent 50%),
+                var(--bg-primary);
+        }
+
+        #particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .content-wrapper {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .header h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--gold-primary), var(--gold-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 30px var(--gold-glow);
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .main-display {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            border-radius: 24px;
+            padding: 3rem 2rem;
+            width: 100%;
+            text-align: center;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .main-display::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--gold-primary), transparent);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid var(--green-accent);
+            border-radius: 50px;
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+            animation: pulse-glow 2s infinite;
+        }
+
+        .status-badge.resting {
+            background: rgba(156, 163, 175, 0.2);
+            border-color: var(--text-secondary);
+            animation: none;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--green-accent);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-badge.resting .status-dot {
+            background: var(--text-secondary);
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 10px rgba(76, 175, 80, 0.3); }
+            50% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.5); }
+        }
+
+        .earnings-label {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            font-weight: 300;
+        }
+
+        .earnings-amount {
+            font-family: 'Orbitron', monospace;
+            font-size: 4rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--gold-primary) 0%, #fff 50%, var(--gold-secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 60px var(--gold-glow);
+            position: relative;
+            display: inline-block;
+        }
+
+        .earnings-amount.animating {
+            animation: number-glow 0.3s ease-out;
+        }
+
+        @keyframes number-glow {
+            0% { filter: brightness(1); }
+            50% { filter: brightness(1.5); }
+            100% { filter: brightness(1); }
+        }
+
+        .earnings-increment {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.5rem;
+            color: var(--gold-primary);
+            margin-top: 1rem;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s ease;
+        }
+
+        .earnings-increment.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .progress-ring-container {
+            margin-top: 2rem;
+            position: relative;
+            display: flex;
+            justify-content: center;
+        }
+
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+
+        .progress-ring-bg {
+            fill: none;
+            stroke: rgba(255, 215, 0, 0.1);
+            stroke-width: 8;
+        }
+
+        .progress-ring-fill {
+            fill: none;
+            stroke: url(#gold-gradient);
+            stroke-width: 8;
+            stroke-linecap: round;
+            stroke-dasharray: 440;
+            stroke-dashoffset: 440;
+            transition: stroke-dashoffset 0.5s ease;
+            filter: drop-shadow(0 0 10px var(--gold-glow));
+        }
+
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .progress-percent {
+            font-family: 'Orbitron', monospace;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--gold-primary);
+        }
+
+        .progress-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            width: 100%;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            border-color: var(--gold-primary);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.1);
+        }
+
+        .stat-icon {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--gold-primary);
+            margin-bottom: 0.3rem;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .btn {
+            padding: 0.8rem 1.5rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--gold-primary), var(--gold-secondary));
+            color: var(--bg-primary);
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px var(--gold-glow);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--gold-primary);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            border-radius: 24px;
+            padding: 2rem;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .modal-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .modal-close:hover {
+            color: var(--gold-primary);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.8rem 1rem;
+            background: var(--bg-primary);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--gold-primary);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .checkbox-item {
+            padding: 0.5rem 1rem;
+            background: var(--bg-primary);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .checkbox-item:hover {
+            border-color: var(--gold-primary);
+        }
+
+        .checkbox-item.active {
+            background: rgba(255, 215, 0, 0.2);
+            border-color: var(--gold-primary);
+            color: var(--gold-primary);
+        }
+
+        .switch-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: var(--bg-primary);
+            border-radius: 12px;
+        }
+
+        .switch-label {
+            font-size: 0.95rem;
+        }
+
+        .switch {
+            width: 50px;
+            height: 26px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .switch.active {
+            background: var(--gold-primary);
+        }
+
+        .switch::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+
+        .switch.active::after {
+            transform: translateX(24px);
+        }
+
+        .footer {
+            margin-top: auto;
+            padding-top: 2rem;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+
+        @media (max-width: 768px) {
+            .earnings-amount {
+                font-size: 2.5rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .btn {
+                justify-content: center;
+            }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .floating {
+            animation: float 3s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="particle-canvas"></canvas>
+    
+    <div class="app-container">
+        <div class="content-wrapper">
+            <header class="header">
+                <h1>💰 即时薪资追踪器</h1>
+                <p>每一分钟，都在创造价值</p>
+            </header>
+
+            <main class="main-display">
+                <div class="status-badge" id="status-badge">
+                    <span class="status-dot"></span>
+                    <span id="status-text">工作中</span>
+                </div>
+                
+                <p class="earnings-label">今日已赚</p>
+                <div class="earnings-amount" id="earnings-amount">¥0.00</div>
+                <div class="earnings-increment" id="earnings-increment">+¥0.00/分钟</div>
+
+                <div class="progress-ring-container">
+                    <svg class="progress-ring" width="200" height="200">
+                        <defs>
+                            <linearGradient id="gold-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" style="stop-color:#ffd700"/>
+                                <stop offset="100%" style="stop-color:#ffaa00"/>
+                            </linearGradient>
+                        </defs>
+                        <circle class="progress-ring-bg" cx="100" cy="100" r="70"/>
+                        <circle class="progress-ring-fill" id="progress-ring" cx="100" cy="100" r="70"/>
+                    </svg>
+                    <div class="progress-text">
+                        <div class="progress-percent" id="progress-percent">0%</div>
+                        <div class="progress-label">今日进度</div>
+                    </div>
+                </div>
+            </main>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-value" id="per-minute">¥0.00</div>
+                    <div class="stat-label">每分钟收入</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📅</div>
+                    <div class="stat-value" id="today-progress">0%</div>
+                    <div class="stat-label">工作进度</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">💎</div>
+                    <div class="stat-value" id="monthly-total">¥0</div>
+                    <div class="stat-label">本月累计</div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn btn-primary" id="settings-btn">
+                    <span>⚙️</span>
+                    设置
+                </button>
+                <button class="btn btn-secondary" id="sound-toggle">
+                    <span id="sound-icon">🔊</span>
+                    音效
+                </button>
+            </div>
+
+            <footer class="footer">
+                <p>工作时间: <span id="work-hours">09:00 - 18:00</span></p>
+            </footer>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">⚙️ 设置</h2>
+                <button class="modal-close" id="modal-close">×</button>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">月薪 (税前)</label>
+                <input type="number" class="form-input" id="salary-input" placeholder="请输入月薪" value="15000">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">上班时间</label>
+                    <input type="time" class="form-input" id="start-time" value="09:00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">下班时间</label>
+                    <input type="time" class="form-input" id="end-time" value="18:00">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">工作日</label>
+                <div class="checkbox-group" id="work-days">
+                    <div class="checkbox-item" data-day="1">周一</div>
+                    <div class="checkbox-item" data-day="2">周二</div>
+                    <div class="checkbox-item" data-day="3">周三</div>
+                    <div class="checkbox-item" data-day="4">周四</div>
+                    <div class="checkbox-item" data-day="5">周五</div>
+                    <div class="checkbox-item" data-day="6">周六</div>
+                    <div class="checkbox-item" data-day="0">周日</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">发薪日 (每月几号)</label>
+                <input type="number" class="form-input" id="payday-input" placeholder="请输入发薪日" value="25" min="1" max="31">
+            </div>
+
+            <div class="form-group">
+                <div class="switch-container">
+                    <span class="switch-label">💰 金币音效</span>
+                    <div class="switch active" id="sound-switch"></div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" style="width: 100%; justify-content: center;" id="save-settings">
+                保存设置
+            </button>
+        </div>
+    </div>
+
+    <script>
+        class ParticleSystem {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.particles = [];
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+            }
+
+            resize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            }
+
+            createParticle(x, y) {
+                const particle = {
+                    x: x || Math.random() * this.canvas.width,
+                    y: y || this.canvas.height,
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: -Math.random() * 3 - 2,
+                    size: Math.random() * 4 + 2,
+                    alpha: 1,
+                    color: `rgba(255, ${Math.floor(Math.random() * 100 + 155)}, 0, `,
+                    life: 1
+                };
+                this.particles.push(particle);
+                
+                if (this.particles.length > 100) {
+                    this.particles.shift();
+                }
+            }
+
+            createBurst(x, y, count = 10) {
+                for (let i = 0; i < count; i++) {
+                    this.createParticle(x, y);
+                }
+            }
+
+            update() {
+                this.particles = this.particles.filter(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.05;
+                    p.alpha -= 0.01;
+                    p.life -= 0.01;
+                    return p.life > 0;
+                });
+            }
+
+            draw() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                this.particles.forEach(p => {
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    this.ctx.fillStyle = p.color + p.alpha + ')';
+                    this.ctx.fill();
+                    
+                    this.ctx.shadowBlur = 10;
+                    this.ctx.shadowColor = p.color + '0.5)';
+                });
+                
+                this.ctx.shadowBlur = 0;
+            }
+
+            animate() {
+                this.update();
+                this.draw();
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        class SalaryTracker {
+            constructor() {
+                this.config = this.loadConfig();
+                this.state = {
+                    isWorking: false,
+                    todayStartTime: null,
+                    todayEarnings: 0,
+                    lastSecond: -1
+                };
+                
+                this.initElements();
+                this.initParticleSystem();
+                this.initEventListeners();
+                this.applyConfig();
+                this.startTracking();
+            }
+
+            loadConfig() {
+                const saved = localStorage.getItem('salary-tracker-config');
+                if (saved) {
+                    const config = JSON.parse(saved);
+                    return {
+                        ...config,
+                        payday: config.payday !== undefined ? config.payday : 25
+                    };
+                }
+                return {
+                    monthlySalary: 15000,
+                    workStartTime: '09:00',
+                    workEndTime: '18:00',
+                    workDays: [1, 2, 3, 4, 5],
+                    soundEnabled: true,
+                    payday: 25
+                };
+            }
+
+            saveConfig() {
+                localStorage.setItem('salary-tracker-config', JSON.stringify(this.config));
+            }
+
+            initElements() {
+                this.earningsAmountEl = document.getElementById('earnings-amount');
+                this.earningsIncrementEl = document.getElementById('earnings-increment');
+                this.progressRingEl = document.getElementById('progress-ring');
+                this.progressPercentEl = document.getElementById('progress-percent');
+                this.perMinuteEl = document.getElementById('per-minute');
+                this.todayProgressEl = document.getElementById('today-progress');
+                this.monthlyTotalEl = document.getElementById('monthly-total');
+                this.statusBadgeEl = document.getElementById('status-badge');
+                this.statusTextEl = document.getElementById('status-text');
+                this.workHoursEl = document.getElementById('work-hours');
+                this.soundIconEl = document.getElementById('sound-icon');
+                this.modalEl = document.getElementById('settings-modal');
+                
+                this.salaryInputEl = document.getElementById('salary-input');
+                this.startTimeEl = document.getElementById('start-time');
+                this.endTimeEl = document.getElementById('end-time');
+                this.workDaysEl = document.getElementById('work-days');
+                this.soundSwitchEl = document.getElementById('sound-switch');
+                this.paydayInputEl = document.getElementById('payday-input');
+            }
+
+            initParticleSystem() {
+                this.canvas = document.getElementById('particle-canvas');
+                this.particleSystem = new ParticleSystem(this.canvas);
+                this.particleSystem.animate();
+            }
+
+            initEventListeners() {
+                document.getElementById('settings-btn').addEventListener('click', () => {
+                    this.modalEl.classList.add('active');
+                });
+
+                document.getElementById('modal-close').addEventListener('click', () => {
+                    this.modalEl.classList.remove('active');
+                });
+
+                this.modalEl.addEventListener('click', (e) => {
+                    if (e.target === this.modalEl) {
+                        this.modalEl.classList.remove('active');
+                    }
+                });
+
+                document.getElementById('sound-toggle').addEventListener('click', () => {
+                    this.config.soundEnabled = !this.config.soundEnabled;
+                    this.updateSoundUI();
+                    this.saveConfig();
+                });
+
+                document.querySelectorAll('#work-days .checkbox-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        item.classList.toggle('active');
+                    });
+                });
+
+                this.soundSwitchEl.addEventListener('click', () => {
+                    this.soundSwitchEl.classList.toggle('active');
+                    this.config.soundEnabled = this.soundSwitchEl.classList.contains('active');
+                });
+
+                document.getElementById('save-settings').addEventListener('click', () => {
+                    this.config.monthlySalary = parseFloat(this.salaryInputEl.value) || 15000;
+                    this.config.workStartTime = this.startTimeEl.value;
+                    this.config.workEndTime = this.endTimeEl.value;
+                    this.config.payday = Math.max(1, Math.min(31, parseInt(this.paydayInputEl.value) || 25));
+                    
+                    this.config.workDays = Array.from(document.querySelectorAll('#work-days .checkbox-item.active'))
+                        .map(el => parseInt(el.dataset.day));
+
+                    this.saveConfig();
+                    this.applyConfig();
+                    this.modalEl.classList.remove('active');
+                    
+                    this.particleSystem.createBurst(window.innerWidth / 2, 100, 30);
+                });
+            }
+
+            applyConfig() {
+                this.salaryInputEl.value = this.config.monthlySalary;
+                this.startTimeEl.value = this.config.workStartTime;
+                this.endTimeEl.value = this.config.workEndTime;
+                this.paydayInputEl.value = this.config.payday;
+                
+                document.querySelectorAll('#work-days .checkbox-item').forEach(item => {
+                    const day = parseInt(item.dataset.day);
+                    item.classList.toggle('active', this.config.workDays.includes(day));
+                });
+
+                this.workHoursEl.textContent = `${this.config.workStartTime} - ${this.config.workEndTime}`;
+                this.updateSoundUI();
+                this.updatePerMinute();
+            }
+
+            updateSoundUI() {
+                this.soundIconEl.textContent = this.config.soundEnabled ? '🔊' : '🔇';
+                this.soundSwitchEl.classList.toggle('active', this.config.soundEnabled);
+            }
+
+            getSecondsPerMonth() {
+                const workDaysPerMonth = 21.75;
+                const [startH, startM] = this.config.workStartTime.split(':').map(Number);
+                const [endH, endM] = this.config.workEndTime.split(':').map(Number);
+                const hoursPerDay = (endH * 60 + endM - startH * 60 - startM) / 60;
+                
+                return this.config.workDays.length * workDaysPerMonth * hoursPerDay * 3600;
+            }
+
+            getDailySalary() {
+                const workDaysPerMonth = 21.75;
+                return this.config.monthlySalary / workDaysPerMonth;
+            }
+
+            getIncomePerMinute() {
+                const dailySalary = this.getDailySalary();
+                const [startH, startM] = this.config.workStartTime.split(':').map(Number);
+                const [endH, endM] = this.config.workEndTime.split(':').map(Number);
+                const minutesPerDay = (endH * 60 + endM - startH * 60 - startM);
+                
+                return dailySalary / minutesPerDay;
+            }
+
+            updatePerMinute() {
+                const perMinute = this.getIncomePerMinute();
+                this.perMinuteEl.textContent = `¥${perMinute.toFixed(2)}`;
+            }
+
+            isWorkingTime() {
+                const now = new Date();
+                const currentDay = now.getDay();
+                const currentTime = now.getHours() * 60 + now.getMinutes();
+                
+                const [startH, startM] = this.config.workStartTime.split(':').map(Number);
+                const [endH, endM] = this.config.workEndTime.split(':').map(Number);
+                const startMinutes = startH * 60 + startM;
+                const endMinutes = endH * 60 + endM;
+
+                return this.config.workDays.includes(currentDay) &&
+                       currentTime >= startMinutes && 
+                       currentTime < endMinutes;
+            }
+
+            getTodayWorkSeconds() {
+                const now = new Date();
+                const [startH, startM] = this.config.workStartTime.split(':').map(Number);
+                const [endH, endM] = this.config.workEndTime.split(':').map(Number);
+                
+                const startMinutes = startH * 60 + startM;
+                const endMinutes = endH * 60 + endM;
+                const currentMinutes = now.getHours() * 60 + now.getMinutes();
+                const currentSeconds = now.getSeconds();
+                
+                if (currentMinutes < startMinutes) return 0;
+                if (currentMinutes >= endMinutes) return (endMinutes - startMinutes) * 60;
+                
+                const workedMinutes = currentMinutes - startMinutes;
+                const workedSeconds = workedMinutes * 60 + currentSeconds;
+                return workedSeconds;
+            }
+
+            getTodayProgress() {
+                const [startH, startM] = this.config.workStartTime.split(':').map(Number);
+                const [endH, endM] = this.config.workEndTime.split(':').map(Number);
+                const totalMinutes = (endH * 60 + endM - startH * 60 - startM);
+                const currentMinutes = this.getTodayWorkSeconds() / 60;
+                
+                return Math.min(currentMinutes / totalMinutes, 1);
+            }
+
+            updateDisplay() {
+                const workSeconds = this.getTodayWorkSeconds();
+                const dailySalary = this.getDailySalary();
+                const [startH, startM] = this.config.workStartTime.split(':').map(Number);
+                const [endH, endM] = this.config.workEndTime.split(':').map(Number);
+                const secondsPerDay = (endH * 60 + endM - startH * 60 - startM) * 60;
+                const todayEarnings = (workSeconds / secondsPerDay) * dailySalary;
+                const incomePerMinute = this.getIncomePerMinute();
+                
+                const displayValue = `¥${todayEarnings.toFixed(2)}`;
+                if (this.earningsAmountEl.textContent !== displayValue) {
+                    this.earningsAmountEl.textContent = displayValue;
+                    this.earningsAmountEl.classList.add('animating');
+                    setTimeout(() => this.earningsAmountEl.classList.remove('animating'), 300);
+                    
+                    const increment = incomePerMinute.toFixed(2);
+                    this.earningsIncrementEl.textContent = `+¥${increment}/分钟`;
+                    this.earningsIncrementEl.classList.add('show');
+                    setTimeout(() => this.earningsIncrementEl.classList.remove('show'), 500);
+                    
+                    if (Math.random() > 0.7 && this.config.soundEnabled) {
+                        this.playSound();
+                    }
+                    
+                    if (Math.random() > 0.5) {
+                        this.particleSystem.createBurst(
+                            window.innerWidth / 2 + (Math.random() - 0.5) * 200,
+                            window.innerHeight / 2,
+                            2
+                        );
+                    }
+                }
+
+                const progress = this.getTodayProgress();
+                const circumference = 2 * Math.PI * 70;
+                const offset = circumference * (1 - progress);
+                this.progressRingEl.style.strokeDashoffset = offset;
+                this.progressPercentEl.textContent = `${Math.round(progress * 100)}%`;
+                
+                this.todayProgressEl.textContent = `${Math.round(progress * 100)}%`;
+                
+                const now = new Date();
+                const currentDay = now.getDate();
+                const payday = this.config.payday;
+                let daysSincePayday;
+                
+                if (currentDay >= payday) {
+                    daysSincePayday = currentDay - payday + 1;
+                } else {
+                    const currentMonth = now.getMonth();
+                    const currentYear = now.getFullYear();
+                    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+                    const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+                    const daysInPrevMonth = new Date(prevYear, prevMonth + 1, 0).getDate();
+                    daysSincePayday = daysInPrevMonth - payday + 1 + currentDay;
+                }
+                
+                const workDaysSincePayday = this.countWorkDaysSincePayday();
+                const monthlyTotal = dailySalary * workDaysSincePayday;
+                this.monthlyTotalEl.textContent = `¥${Math.round(monthlyTotal).toLocaleString()}`;
+            }
+
+            countWorkDaysSincePayday() {
+                const now = new Date();
+                const payday = this.config.payday;
+                let count = 0;
+                
+                const startDate = new Date(now.getFullYear(), now.getMonth(), payday);
+                if (startDate > now) {
+                    const prevMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+                    const prevYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+                    startDate.setFullYear(prevYear, prevMonth, payday);
+                }
+                
+                const currentDate = new Date(startDate);
+                while (currentDate <= now) {
+                    const dayOfWeek = currentDate.getDay();
+                    if (this.config.workDays.includes(dayOfWeek)) {
+                        count++;
+                    }
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+                
+                return count;
+            }
+
+            updateStatus() {
+                const isWorking = this.isWorkingTime();
+                this.state.isWorking = isWorking;
+                
+                if (isWorking) {
+                    this.statusBadgeEl.classList.remove('resting');
+                    this.statusTextEl.textContent = '工作中';
+                } else {
+                    this.statusBadgeEl.classList.add('resting');
+                    this.statusTextEl.textContent = '休息中';
+                }
+            }
+
+            playSound() {
+                try {
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.frequency.value = 800 + Math.random() * 400;
+                    oscillator.type = 'sine';
+                    
+                    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.1);
+                } catch (e) {
+                    console.log('Audio not supported');
+                }
+            }
+
+            startTracking() {
+                this.updateStatus();
+                this.updateDisplay();
+                
+                setInterval(() => {
+                    this.updateStatus();
+                    this.updateDisplay();
+                }, 100);
+                
+                setInterval(() => {
+                    if (this.state.isWorking && this.config.soundEnabled) {
+                        this.particleSystem.createBurst(
+                            window.innerWidth / 2,
+                            window.innerHeight / 2,
+                            5
+                        );
+                    }
+                }, 1000);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new SalaryTracker();
+            
+            setTimeout(() => {
+                document.querySelector('.main-display').classList.add('floating');
+            }, 100);
+        });
+    </script>
+</body>
+</html>
