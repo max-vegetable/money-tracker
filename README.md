@@ -14,7 +14,7 @@
 
 ### 在线访问
 
-通过 GitHub Pages 访问：https://your-username.github.io/salary-tracker
+通过 GitHub Pages 访问：https://max-vegetable.github.io/money-tracker
 
 ### 本地运行
 
