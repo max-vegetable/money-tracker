@@ -9,8 +9,6 @@ app.whenReady().then(() => {
         minHeight: 600,
         x: 100,
         y: 100,
-        frame: true,
-        transparent: false,
         alwaysOnTop: true,
         resizable: true,
         backgroundColor: '#0a0e17',
@@ -22,22 +20,15 @@ app.whenReady().then(() => {
     });
 
     win.loadFile('index.html');
-
     win.setMenuBarVisibility(false);
-
-    win.on('closed', () => {
-        win = null;
-    });
-
-    app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) {
-            createWindow();
-        }
-    });
 });
 
 app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-        app.quit();
+    if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+        app.whenReady();
     }
 });
