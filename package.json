@@ -2,39 +2,12 @@
   "name": "salary-tracker",
   "productName": "老子今天又赚 200",
   "version": "1.0.0",
-  "description": "💰 老子今天又赚 200 - 薪资追踪桌面小组件",
-  "main": "main.js",
+  "description": "老子今天又赚 200 - 薪资追踪桌面小组件",
   "scripts": {
-    "start": "electron .",
-    "build": "electron-builder --mac",
-    "build:dir": "electron-builder --mac --dir"
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri"
   },
-  "author": "",
-  "license": "MIT",
-  "devDependencies": {
-    "electron": "^28.0.0",
-    "electron-builder": "^24.9.1"
-  },
-  "build": {
-    "appId": "com.salarytracker.app",
-    "productName": "老子今天又赚 200",
-    "copyright": "Copyright © 2024",
-    "mac": {
-      "target": [
-        {
-          "target": "dmg",
-          "arch": ["x64", "arm64"]
-        }
-      ],
-      "category": "public.app-category.productivity",
-      "icon": "icon.icns"
-    },
-    "dmg": {
-      "title": "老子今天又赚 200",
-      "window": {
-        "width": 540,
-        "height": 380
-      }
-    }
-  }
+  "private": true,
+  "type": "module"
 }
